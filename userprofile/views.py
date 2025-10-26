@@ -112,3 +112,5 @@ def signup(request):
     return render(request, 'userprofile/signup.html', {
         'form': form
     })
+
+
