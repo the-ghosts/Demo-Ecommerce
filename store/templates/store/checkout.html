@@ -1,0 +1,78 @@
+{% extends 'core/base.html' %}
+
+{% block title %} Checkout {% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto p-6 bg-white rounded-xl shadow-md">
+    <h1 class="text-2xl font-semibold mb-4">Checkout</h1>
+    <h2 class="text-lg text-gray-600 mb-6">Total cost: ${{ cart.get_total_cost }}</h2>
+
+    <form id="checkout-form">
+        {{ form.as_p }}
+
+        <button 
+            type="submit"
+            class="w-full mt-4 bg-teal-500 hover:bg-teal-600 text-white py-3 rounded-lg font-medium"
+            onclick="buy(event)">
+            Checkout
+        </button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+    function buy(event) {
+        event.preventDefault();
+
+        const stripe = Stripe('{{ pub_key }}');
+
+        // Collect data from the form fields
+        const data = {
+            first_name: document.getElementById('id_first_name').value,
+            last_name: document.getElementById('id_last_name').value,
+            address: document.getElementById('id_address').value,
+            zipcode: document.getElementById('id_zipcode').value,
+            city: document.getElementById('id_city').value,
+        };
+
+        // ✅ Frontend validation before sending request
+        for (let key in data) {
+            if (!data[key] || data[key].trim() === "") {
+                alert(`The ${key.replace('_', ' ')} is missing`);
+                return; // Stop if any field is empty
+            }
+        }
+
+        // ✅ Send data to Django backend
+        fetch("{% url 'checkout' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(session => {
+            if (!session || !session.sessionId) {
+                alert("Error creating checkout session.");
+                console.error("Invalid session response:", session);
+                return;
+            }
+            // ✅ Redirect to Stripe Checkout
+            return stripe.redirectToCheckout({ sessionId: session.sessionId });
+        })
+        .then(result => {
+            if (result && result.error) {
+                alert(result.error.message);
+            }
+        })
+        .catch(error => {
+            console.error("Error:", error);
+            alert("Something went wrong. Please try again.");
+        });
+    }
+</script>
+{% endblock %}
